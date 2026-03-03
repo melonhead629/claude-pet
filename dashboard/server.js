@@ -18,10 +18,9 @@ function getEnrichedState() {
   engine.applyDecay(state);
   engine.saveState(state);
 
-  const activeDays = state.activeDays || 0;
-  const stage = engine.getStage(activeDays, state.lifetimeTokens);
+  const stage = engine.getStage(state.lifetimeTokens);
   const mood = engine.getMood(state.hunger, state.happiness);
-  const evolution = engine.getEvolution(activeDays, state.lifetimeTokens);
+  const evolution = engine.getEvolution(state.lifetimeTokens);
   const fire = engine.streakFire(state.streakDays || 0);
 
   return {
@@ -30,7 +29,6 @@ function getEnrichedState() {
     happiness: Math.round(state.happiness * 10) / 10,
     energy: Math.round(state.energy * 10) / 10,
     lifetimeTokens: state.lifetimeTokens,
-    activeDays,
     streakDays: state.streakDays || 0,
     bestStreak: state.bestStreak || 0,
     milestones: state.milestones || [],

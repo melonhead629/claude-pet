@@ -50,17 +50,17 @@ function getYesterday() {
 
 // ─── Evolution stages (dual-gated: active days + tokens) ───
 const STAGES = [
-  { name: 'egg',   minDays: 0,  minTokens: 0 },
-  { name: 'baby',  minDays: 1,  minTokens: 100 },
-  { name: 'teen',  minDays: 5,  minTokens: 1500 },
-  { name: 'adult', minDays: 14, minTokens: 8000 },
-  { name: 'elder', minDays: 30, minTokens: 25000 },
+  { name: 'egg',   minTokens: 0 },
+  { name: 'baby',  minTokens: 100 },
+  { name: 'teen',  minTokens: 1500 },
+  { name: 'adult', minTokens: 8000 },
+  { name: 'elder', minTokens: 25000 },
 ];
 
-function getStage(activeDays, lifetimeTokens) {
+function getStage(lifetimeTokens) {
   let stage = STAGES[0].name;
   for (const s of STAGES) {
-    if (activeDays >= s.minDays && lifetimeTokens >= s.minTokens) {
+    if (lifetimeTokens >= s.minTokens) {
       stage = s.name;
     }
   }
@@ -380,29 +380,19 @@ function statBar(value, width = 10) {
   return `${color}${'█'.repeat(filled)}${c.gy}${'░'.repeat(empty)}${c.r}`;
 }
 
-// ─── Evolution progress (dual-axis: days + tokens) ───
-function getEvolution(activeDays, lifetimeTokens) {
-  const stage = getStage(activeDays, lifetimeTokens);
+// ─── Evolution progress (token-based) ───
+function getEvolution(lifetimeTokens) {
+  const stage = getStage(lifetimeTokens);
   if (stage === 'elder') return null;
 
-  // Find current and next stage index
   const idx = STAGES.findIndex(s => s.name === stage);
   const next = STAGES[idx + 1];
   if (!next) return null;
 
   const cur = STAGES[idx];
-
-  // Calculate progress on each axis
-  const dayRange = next.minDays - cur.minDays;
   const tokenRange = next.minTokens - cur.minTokens;
-  const dayProgress = Math.min(activeDays - cur.minDays, dayRange);
   const tokenProgress = Math.min(lifetimeTokens - cur.minTokens, tokenRange);
-  const dayPct = dayRange > 0 ? dayProgress / dayRange : 1;
-  const tokenPct = tokenRange > 0 ? tokenProgress / tokenRange : 1;
-
-  // Bottleneck is the one further from completion
-  const bottleneck = dayPct <= tokenPct ? 'days' : 'tokens';
-  const pct = Math.min(dayPct, tokenPct); // overall progress = bottleneck
+  const pct = tokenRange > 0 ? tokenProgress / tokenRange : 1;
 
   const width = 20;
   const filled = Math.round(pct * width);
@@ -413,9 +403,6 @@ function getEvolution(activeDays, lifetimeTokens) {
     bar: `${c.cy}${'▓'.repeat(filled)}${c.gy}${'░'.repeat(empty)}${c.r}`,
     next: nextLabel,
     pct: Math.round(pct * 100),
-    bottleneck,
-    dayProgress,
-    dayTarget: dayRange,
     tokenProgress,
     tokenTarget: tokenRange,
   };
@@ -533,7 +520,7 @@ const actions = {
     applyDecay(state);
     saveState(state);
 
-    const stage = getStage(state.activeDays || 0, state.lifetimeTokens);
+    const stage = getStage(state.lifetimeTokens);
     const mood = getMood(state.hunger, state.happiness);
     const stageLabel = stage.charAt(0).toUpperCase() + stage.slice(1);
     const moodLabel = mood.charAt(0).toUpperCase() + mood.slice(1);
@@ -577,15 +564,13 @@ const actions = {
     lines.push('');
 
     // ── Evolution progress ──
-    const evo = getEvolution(state.activeDays || 0, state.lifetimeTokens);
+    const evo = getEvolution(state.lifetimeTokens);
     if (evo) {
       const evoTitle = `Next: ${evo.next}`;
       const dashLen = Math.max(1, 30 - evoTitle.length);
       lines.push(`  ${c.gy}──${c.r} ${c.cy}${evoTitle}${c.r} ${c.gy}${'─'.repeat(dashLen)}${c.r}`);
       lines.push(`  ${evo.bar}  ${c.d}${String(evo.pct).padStart(3)}%${c.r}`);
-      const bottleLabel = evo.bottleneck === 'days' ? 'days' : 'tokens';
-      lines.push(`  ${c.d}${evo.dayProgress}/${evo.dayTarget} days · ${evo.tokenProgress.toLocaleString()}/${evo.tokenTarget.toLocaleString()} tokens${c.r}`);
-      lines.push(`  ${c.d}(${bottleLabel} is the bottleneck)${c.r}`);
+      lines.push(`  ${c.d}${evo.tokenProgress.toLocaleString()}/${evo.tokenTarget.toLocaleString()} tokens${c.r}`);
     } else {
       lines.push(`  ${c.bm}${c.b}★ MAX EVOLUTION ★${c.r}`);
     }
@@ -628,7 +613,7 @@ const actions = {
     state.hunger = clamp(state.hunger - 5);
     saveState(state);
 
-    const stage = getStage(state.activeDays || 0, state.lifetimeTokens);
+    const stage = getStage(state.lifetimeTokens);
     const mood = getMood(state.hunger, state.happiness);
     const scene = buildScene(stage, mood, state);
 
@@ -651,7 +636,7 @@ const actions = {
     state.lifetimeTokens += 25;
     saveState(state);
 
-    const stage = getStage(state.activeDays || 0, state.lifetimeTokens);
+    const stage = getStage(state.lifetimeTokens);
     const mood = getMood(state.hunger, state.happiness);
     const scene = buildScene(stage, mood, state);
 

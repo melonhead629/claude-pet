@@ -991,16 +991,13 @@ function render(s) {
   const es = document.getElementById('evoSection');
   if (s.evolution) {
     const p = s.evolution.pct;
-    const bn = s.evolution.bottleneck;
-    const dayLabel = bn === 'days' ? '<strong style="color:var(--warning)">&#9650;</strong> ' : '';
-    const tokLabel = bn === 'tokens' ? '<strong style="color:var(--warning)">&#9650;</strong> ' : '';
     es.innerHTML = `<div class="evo-wrap">
       <div class="evo-header">
         <span class="evo-label">Next: ${s.evolution.next}</span>
         <span class="evo-pct">${p}%</span>
       </div>
       <div class="evo-bar-bg"><div class="evo-bar-fill" style="width:${p}%"></div></div>
-      <div class="evo-detail">${dayLabel}${s.evolution.dayProgress}/${s.evolution.dayTarget} days · ${tokLabel}${s.evolution.tokenProgress.toLocaleString()}/${s.evolution.tokenTarget.toLocaleString()} tokens</div>
+      <div class="evo-detail">${s.evolution.tokenProgress.toLocaleString()}/${s.evolution.tokenTarget.toLocaleString()} tokens</div>
     </div>`;
   } else {
     es.innerHTML = '<div class="evo-max">&#9733; MAX EVOLUTION &#9733;</div>';
