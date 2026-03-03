@@ -444,7 +444,7 @@ function createDefaultState(name) {
     name: name || 'Pixel',
     hunger: 50,
     happiness: 50,
-    energy: 80,
+    energy: 50,
     lifetimeTokens: 0,
     lastUpdate: Date.now(),
     born: Date.now(),
@@ -466,7 +466,7 @@ function applyDecay(state) {
   const streakMult = getStreakDecayMultiplier(state.streakDays || 0);
   let hungerDecay = 5 * hours * streakMult;
   let happinessDecay = 3 * hours * streakMult;
-  const energyGain = 2 * hours;
+  const energyDecay = 4 * hours * streakMult;
 
   // If hunger hits 0, happiness decays 2x faster
   if (state.hunger <= 0) {
@@ -475,7 +475,7 @@ function applyDecay(state) {
 
   state.hunger = clamp(state.hunger - hungerDecay);
   state.happiness = clamp(state.happiness - happinessDecay);
-  state.energy = clamp(state.energy + energyGain);
+  state.energy = clamp(state.energy - energyDecay);
   state.lastUpdate = now;
 
   return state;
@@ -513,7 +513,7 @@ const actions = {
     applyDecay(state);
     state.hunger = clamp(state.hunger + amount * 0.3);
     state.happiness = clamp(state.happiness + amount * 0.1);
-    state.energy = clamp(state.energy - amount * 0.05);
+    state.energy = clamp(state.energy + amount * 0.05);
     state.lifetimeTokens += amount;
     saveState(state);
   },
