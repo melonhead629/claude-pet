@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>claude-pet</title>
+<style>
+  :root {
+    --bg: #0a0e14;
+    --surface: #131921;
+    --surface2: #1a2230;
+    --border: #232e3f;
+    --text: #e2e8f0;
+    --text-dim: #64748b;
+    --text-muted: #475569;
+    --accent: #4ade80;
+    --accent-dim: #4ade8020;
+    --danger: #f43f5e;
+    --warning: #fbbf24;
+    --success: #4ade80;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Subtle top glow matching pet color */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -80px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 300px;
+    height: 200px;
+    background: radial-gradient(ellipse, var(--accent-dim) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    width: 320px;
+    padding: 10px 0 8px;
+  }
+
+  /* ═══════════════════════════════════════════════
+     ONBOARDING
+     ═══════════════════════════════════════════════ */
+  .onboarding {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 490px;
+    padding: 20px 16px;
+    text-align: center;
+    animation: fadeIn 0.6s ease;
+  }
+
+  .onboarding h1 {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.4px;
+    margin-bottom: 2px;
+  }
+
+  .onboarding .subtitle {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+
+  .blob-preview {
+    width: 160px;
+    height: 160px;
+    margin-bottom: 20px;
+  }
+
+  .onboarding label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: left;
+    width: 100%;
+    max-width: 240px;
+    margin-bottom: 6px;
+  }
+
+  .onboarding input[type="text"] {
+    width: 100%;
+    max-width: 240px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 17px;
+    font-weight: 700;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    margin-bottom: 18px;
+  }
+
+  .onboarding input[type="text"]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+  }
+
+  .color-picker {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    max-width: 260px;
+  }
+
+  .color-swatch {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2.5px solid transparent;
+    cursor: pointer;
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .color-swatch:hover { transform: scale(1.15); }
+
+  .color-swatch.selected {
+    border-color: #fff;
+    box-shadow: 0 0 14px var(--swatch-glow, #fff4);
+    transform: scale(1.18);
+  }
+
+  .cta-btn {
+    padding: 12px 36px;
+    border-radius: 12px;
+    border: none;
+    background: var(--accent);
+    color: #0a0e14;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+    letter-spacing: -0.2px;
+  }
+
+  .cta-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 24px var(--accent-dim);
+  }
+
+  .cta-btn:active { transform: translateY(0); }
+  .cta-btn:disabled { opacity: 0.5; cursor: wait; }
+
+  /* ═══════════════════════════════════════════════
+     DASHBOARD
+     ═══════════════════════════════════════════════ */
+  .dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    animation: fadeIn 0.5s ease;
+  }
+
+  /* Header */
+  .header { text-align: center; padding: 2px 0 0; }
+
+  .pet-name {
+    font-size: 21px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent), #fff 30%));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .pet-meta {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-top: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .mood-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 8px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .mood-happy .mood-badge { background: #22c55e18; color: #4ade80; }
+  .mood-neutral .mood-badge { background: #f59e0b18; color: #fbbf24; }
+  .mood-hungry .mood-badge { background: #f59e0b18; color: #fbbf24; }
+  .mood-sad .mood-badge { background: #f43f5e18; color: #fb7185; }
+
+  /* Streak */
+  .streak-row {
+    text-align: center;
+    font-size: 13px;
+    min-height: 18px;
+  }
+  .streak-num { font-weight: 800; }
+  .streak-best { color: var(--text-muted); font-size: 11px; margin-left: 4px; }
+  .streak-bonus { color: var(--text-muted); font-size: 11px; margin-left: 2px; }
+
+  /* Scene */
+  .scene-wrap {
+    display: flex;
+    justify-content: center;
+  }
+
+  .scene-svg { width: 300px; height: 230px; }
+
+  /* Stats card */
+  .stats {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border-radius: 14px;
+    margin: 0 10px;
+    border: 1px solid var(--border);
+  }
+
+  .stat-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  .stat-icon { font-size: 13px; width: 18px; text-align: center; }
+
+  .stat-label {
+    width: 52px;
+    color: var(--text-dim);
+    font-weight: 600;
+    font-size: 12px;
+  }
+
+  .stat-bar-bg {
+    flex: 1;
+    height: 8px;
+    background: var(--surface2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .stat-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.4s ease;
+  }
+
+  .stat-value {
+    width: 32px;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Evolution */
+  .evo-section { margin: 2px 10px 0; }
+
+  .evo-wrap {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+  }
+
+  .evo-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+  }
+
+  .evo-label { font-size: 12px; color: var(--text-dim); font-weight: 600; }
+  .evo-pct { font-size: 12px; font-weight: 700; color: var(--accent); }
+
+  .evo-bar-bg {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .evo-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .evo-detail {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 3px;
+    text-align: right;
+  }
+
+  .evo-max {
+    text-align: center;
+    font-weight: 800;
+    font-size: 13px;
+    padding: 6px 0;
+    background: linear-gradient(90deg, #c084fc, #f0abfc, #c084fc);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 3s ease-in-out infinite;
+  }
+
+  /* Buttons */
+  .buttons {
+    display: flex;
+    gap: 8px;
+    padding: 4px 10px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 8px 0 6px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+  }
+
+  .btn-main {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn-cost {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.2px;
+  }
+
+  .btn:hover:not(:disabled) {
+    background: var(--surface2);
+    border-color: var(--accent);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 12px var(--accent-dim);
+  }
+
+  .btn:active:not(:disabled) { transform: translateY(0); }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .btn-icon { font-size: 15px; }
+
+  /* Flavor text */
+  .flavor {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 2px 16px 0;
+    min-height: 18px;
+    opacity: 0.8;
+  }
+
+  /* Age line */
+  .age-line {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    padding-bottom: 2px;
+    opacity: 0.6;
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%) translateY(60px);
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+    pointer-events: none;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    z-index: 100;
+  }
+
+  .toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+
+  .toast-feed { background: #22c55e22; color: #4ade80; border: 1px solid #22c55e30; }
+  .toast-play { background: #3b82f622; color: #60a5fa; border: 1px solid #3b82f630; }
+  .toast-warn { background: #f59e0b22; color: #fbbf24; border: 1px solid #f59e0b30; }
+
+  /* ═══════════════════════════════════════════════
+     ANIMATIONS
+     ═══════════════════════════════════════════════ */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes breathe {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-5px) scale(1.015); }
+  }
+
+  @keyframes squish {
+    0% { transform: scale(1, 1); }
+    18% { transform: scale(1.2, 0.82); }
+    36% { transform: scale(0.88, 1.12); }
+    54% { transform: scale(1.08, 0.93); }
+    72% { transform: scale(0.97, 1.03); }
+    100% { transform: scale(1, 1); }
+  }
+
+  @keyframes bounce {
+    0% { transform: translateY(0) rotate(0deg); }
+    12% { transform: translateY(-28px) rotate(6deg); }
+    28% { transform: translateY(0) rotate(0deg); }
+    42% { transform: translateY(-14px) rotate(-4deg); }
+    58% { transform: translateY(0) rotate(0deg); }
+    72% { transform: translateY(-5px) rotate(2deg); }
+    88%, 100% { transform: translateY(0) rotate(0deg); }
+  }
+
+  @keyframes pulse-heart {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.22); }
+  }
+
+  @keyframes float-up {
+    0% { transform: translate(0, 0) scale(1); opacity: 0.9; }
+    100% { transform: translate(5px, -30px) scale(0.7); opacity: 0; }
+  }
+
+  @keyframes drift-zzz {
+    0% { transform: translate(0, 0); opacity: 0.7; }
+    100% { transform: translate(8px, -24px); opacity: 0; }
+  }
+
+  @keyframes tear-fall {
+    0% { transform: translateY(0); opacity: 0.7; }
+    100% { transform: translateY(20px); opacity: 0; }
+  }
+
+  @keyframes dots-pulse {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 1; }
+  }
+
+  @keyframes shimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  @keyframes hatch-bob {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-6px) scale(1.04); }
+  }
+
+  @keyframes onboard-glow {
+    0%, 100% { opacity: 0.15; }
+    50% { opacity: 0.3; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ═══ Onboarding ═══ -->
+  <div class="onboarding" id="onboarding" style="display:none;">
+    <h1>Your pet awaits</h1>
+    <p class="subtitle">A coding companion, born from tool calls</p>
+
+    <svg class="blob-preview" viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="previewGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#4ade80"/>
+          <stop offset="100%" stop-color="#22c55e"/>
+        </linearGradient>
+        <radialGradient id="previewGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#4ade80" stop-opacity="0.2"/>
+          <stop offset="100%" stop-color="#4ade80" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <ellipse cx="80" cy="90" rx="45" ry="30" fill="url(#previewGlow)" style="animation: onboard-glow 3s ease-in-out infinite;"/>
+      <ellipse cx="80" cy="115" rx="24" ry="5" fill="#131921" opacity="0.4"/>
+      <g transform="translate(80, 85)" style="animation: hatch-bob 2.5s ease-in-out infinite;">
+        <path d="M0,-28 C14,-30 26,-20 26,-4 C26,14 16,30 0,30 C-16,30 -26,14 -26,-4 C-26,-20 -14,-30 0,-28 Z"
+              fill="url(#previewGrad)" id="previewBlob"/>
+        <g id="previewFace">
+          <circle cx="-6" cy="-6" r="2" fill="#14532d"/>
+          <circle cx="6" cy="-6" r="2" fill="#14532d"/>
+        </g>
+      </g>
+    </svg>
+
+    <label for="nameInput">Name</label>
+    <input type="text" id="nameInput" placeholder="Pixel" maxlength="16" autocomplete="off" spellcheck="false"/>
+
+    <label>Color</label>
+    <div class="color-picker" id="colorPicker"></div>
+
+    <button class="cta-btn" id="onboardBtn" onclick="finishOnboarding()">Let's go!</button>
+  </div>
+
+  <!-- ═══ Dashboard ═══ -->
+  <div class="dashboard" id="dashboard" style="display:none;">
+    <div class="header">
+      <div class="pet-name" id="petName">...</div>
+      <div class="pet-meta" id="petMeta">
+        <span id="stageLabel">...</span>
+        <span class="mood-badge" id="moodBadge">...</span>
+      </div>
+    </div>
+
+    <div class="streak-row" id="streakRow"></div>
+
+    <div class="scene-wrap">
+      <svg class="scene-svg" viewBox="0 0 300 230" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="blobGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#4ade80" id="gradStop1"/>
+            <stop offset="100%" stop-color="#22c55e" id="gradStop2"/>
+          </linearGradient>
+          <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#4ade80" stop-opacity="0.2" id="glowStop"/>
+            <stop offset="100%" stop-color="#4ade80" stop-opacity="0"/>
+          </radialGradient>
+          <path id="heartShape" d="M0,-4.5 C-1.2,-7.5 -5.5,-7.5 -5.5,-4.5 C-5.5,-1.5 0,3.5 0,5.5 C0,3.5 5.5,-1.5 5.5,-4.5 C5.5,-7.5 1.2,-7.5 0,-4.5 Z"/>
+        </defs>
+
+        <!-- Glow behind blob -->
+        <ellipse cx="150" cy="140" rx="55" ry="35" fill="url(#glowGrad)" id="blobGlow"/>
+
+        <!-- Hearts row -->
+        <g id="heartsGroup" transform="translate(150, 18)"></g>
+
+        <!-- Floating elements -->
+        <g id="floaters"></g>
+
+        <!-- Particles -->
+        <g id="particles"></g>
+
+        <!-- Blob -->
+        <g transform="translate(150, 135)">
+          <g id="blobGroup" style="animation: breathe 3.5s ease-in-out infinite;">
+            <ellipse id="blobShadow" cx="0" cy="52" rx="44" ry="6" fill="#0a0e14" opacity="0.35"/>
+            <path id="blobPath" fill="url(#blobGrad)"/>
+            <g id="blobExtras"></g>
+            <g id="faceGroup"></g>
+          </g>
+        </g>
+
+        <!-- Ground -->
+        <rect x="35" y="200" width="230" height="12" rx="6" fill="#131921"/>
+        <rect x="35" y="200" width="230" height="5" rx="3" fill="#1a2230" opacity="0.5"/>
+      </svg>
+    </div>
+
+    <div class="stats">
+      <div class="stat-row">
+        <span class="stat-icon">&#127829;</span>
+        <span class="stat-label">Hunger</span>
+        <div class="stat-bar-bg"><div class="stat-bar-fill" id="hungerBar"></div></div>
+        <span class="stat-value" id="hungerVal">0%</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-icon">&#128155;</span>
+        <span class="stat-label">Joy</span>
+        <div class="stat-bar-bg"><div class="stat-bar-fill" id="happinessBar"></div></div>
+        <span class="stat-value" id="happinessVal">0%</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-icon">&#9889;</span>
+        <span class="stat-label">Energy</span>
+        <div class="stat-bar-bg"><div class="stat-bar-fill" id="energyBar"></div></div>
+        <span class="stat-value" id="energyVal">0%</span>
+      </div>
+    </div>
+
+    <div class="evo-section" id="evoSection"></div>
+
+    <div class="buttons">
+      <button class="btn" id="feedBtn" onclick="doFeed()">
+        <span class="btn-main"><span class="btn-icon">&#127829;</span> Feed</span>
+        <span class="btn-cost">+25 hunger</span>
+      </button>
+      <button class="btn" id="playBtn" onclick="doPlay()">
+        <span class="btn-main"><span class="btn-icon">&#127918;</span> Play</span>
+        <span class="btn-cost">+20 joy · -15 energy</span>
+      </button>
+    </div>
+
+    <div class="flavor" id="flavorText"></div>
+    <div class="age-line" id="ageLine"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── Color Themes ───
+const COLORS = {
+  slime:  { from: '#4ade80', to: '#22c55e', face: '#14532d', glow: '#4ade80', name: 'Slime' },
+  ocean:  { from: '#60a5fa', to: '#3b82f6', face: '#1e3a5f', glow: '#60a5fa', name: 'Ocean' },
+  grape:  { from: '#c084fc', to: '#a855f7', face: '#3b1a6e', glow: '#c084fc', name: 'Grape' },
+  coral:  { from: '#fb7185', to: '#f43f5e', face: '#6e1a2e', glow: '#fb7185', name: 'Coral' },
+  sunset: { from: '#fbbf24', to: '#f59e0b', face: '#5e3a0a', glow: '#fbbf24', name: 'Sunset' },
+  frost:  { from: '#67e8f9', to: '#22d3ee', face: '#0e4e5e', glow: '#67e8f9', name: 'Frost' },
+};
+
+let selectedColor = 'slime';
+
+// ─── SVG Blob Shapes (body + extras) ───
+const BLOBS = {
+  egg: {
+    body: 'M0,-28 C14,-30 26,-20 26,-4 C26,14 16,30 0,30 C-16,30 -26,14 -26,-4 C-26,-20 -14,-30 0,-28 Z',
+    extras: '',
+  },
+  baby: {
+    body: 'M0,-32 C18,-34 36,-22 36,-2 C36,18 20,36 0,36 C-20,36 -36,18 -36,-2 C-36,-22 -18,-34 0,-32 Z',
+    extras: '',
+  },
+  teen: {
+    body: 'M0,-44 C28,-44 50,-30 50,-2 C50,26 30,48 0,48 C-30,48 -50,26 -50,-2 C-50,-30 -28,-44 0,-44 Z',
+    extras: `<ellipse cx="-32" cy="-38" rx="8" ry="12" fill="url(#blobGrad)" transform="rotate(-15, -32, -38)"/>
+             <ellipse cx="32" cy="-38" rx="8" ry="12" fill="url(#blobGrad)" transform="rotate(15, 32, -38)"/>`,
+  },
+  adult: {
+    body: 'M0,-52 C34,-52 62,-36 62,-6 C62,24 38,56 0,56 C-38,56 -62,24 -62,-6 C-62,-36 -34,-52 0,-52 Z',
+    extras: `<ellipse cx="-20" cy="-56" rx="5" ry="8" fill="url(#blobGrad)"/>
+             <ellipse cx="0" cy="-60" rx="5" ry="10" fill="url(#blobGrad)"/>
+             <ellipse cx="20" cy="-56" rx="5" ry="8" fill="url(#blobGrad)"/>`,
+  },
+  elder: {
+    body: 'M0,-56 C38,-56 66,-40 66,-8 C66,28 42,60 0,60 C-42,60 -66,28 -66,-8 C-66,-40 -38,-56 0,-56 Z',
+    extras: `<path d="M-66,-8 C-78,-20 -82,-42 -70,-48 C-58,-54 -52,-30 -56,-10" fill="url(#blobGrad)" opacity="0.85"/>
+             <path d="M66,-8 C78,-20 82,-42 70,-48 C58,-54 52,-30 56,-10" fill="url(#blobGrad)" opacity="0.85"/>
+             <ellipse cx="0" cy="-72" rx="22" ry="6" fill="none" stroke="url(#blobGrad)" stroke-width="2" opacity="0.6">
+               <animate attributeName="ry" values="6;8;6" dur="3s" repeatCount="indefinite"/>
+               <animate attributeName="opacity" values="0.6;0.9;0.6" dur="3s" repeatCount="indefinite"/>
+             </ellipse>`,
+  },
+};
+
+const SHADOW_RX = { egg: 22, baby: 28, teen: 40, adult: 52, elder: 56 };
+
+// ─── Face SVG generators ───
+function makeFace(mood, oy, fc, stage) {
+  fc = fc || '#14532d';
+
+  // Egg gets minimal face — just two dot eyes
+  if (stage === 'egg') {
+    return `<circle cx="-6" cy="${-6+oy}" r="2" fill="${fc}"/>
+            <circle cx="6" cy="${-6+oy}" r="2" fill="${fc}"/>`;
+  }
+
+  // Scale factor for larger stages
+  const scale = { baby: 1, teen: 1, adult: 1.05, elder: 1.1 }[stage] || 1;
+  const sw = (2.5 * scale).toFixed(1);
+  const sw2 = (2 * scale).toFixed(1);
+
+  const faces = {
+    happy: `
+      <path d="M-10,${-10+oy} Q-8,${-15+oy} -6,${-10+oy}" stroke="${fc}" stroke-width="${sw}" fill="none" stroke-linecap="round"/>
+      <path d="M6,${-10+oy} Q8,${-15+oy} 10,${-10+oy}" stroke="${fc}" stroke-width="${sw}" fill="none" stroke-linecap="round"/>
+      <path d="M-6,${2+oy} Q0,${8+oy} 6,${2+oy}" stroke="${fc}" stroke-width="${sw2}" fill="none" stroke-linecap="round"/>`,
+    neutral: `
+      <circle cx="-8" cy="${-10+oy}" r="${3*scale}" fill="${fc}" class="eye-open"/>
+      <line x1="-11" y1="${-10+oy}" x2="-5" y2="${-10+oy}" stroke="${fc}" stroke-width="${sw}" stroke-linecap="round" class="eye-closed" style="display:none"/>
+      <circle cx="8" cy="${-10+oy}" r="${3*scale}" fill="${fc}" class="eye-open"/>
+      <line x1="5" y1="${-10+oy}" x2="11" y2="${-10+oy}" stroke="${fc}" stroke-width="${sw}" stroke-linecap="round" class="eye-closed" style="display:none"/>
+      <line x1="-5" y1="${2+oy}" x2="5" y2="${2+oy}" stroke="${fc}" stroke-width="${sw2}" stroke-linecap="round"/>`,
+    hungry: `
+      <line x1="-12" y1="${-13+oy}" x2="-5" y2="${-7+oy}" stroke="${fc}" stroke-width="${sw}" stroke-linecap="round"/>
+      <line x1="-5" y1="${-13+oy}" x2="-12" y2="${-7+oy}" stroke="${fc}" stroke-width="${sw}" stroke-linecap="round"/>
+      <line x1="5" y1="${-13+oy}" x2="12" y2="${-7+oy}" stroke="${fc}" stroke-width="${sw}" stroke-linecap="round"/>
+      <line x1="12" y1="${-13+oy}" x2="5" y2="${-7+oy}" stroke="${fc}" stroke-width="${sw}" stroke-linecap="round"/>
+      <path d="M-5,${2+oy} Q-2,${5+oy} 0,${2+oy} Q2,${-1+oy} 5,${2+oy}" stroke="${fc}" stroke-width="${sw2}" fill="none" stroke-linecap="round"/>`,
+    sad: `
+      <path d="M-10,${-8+oy} Q-8,${-13+oy} -6,${-10+oy}" stroke="${fc}" stroke-width="${sw}" fill="none" stroke-linecap="round"/>
+      <path d="M6,${-10+oy} Q8,${-13+oy} 10,${-8+oy}" stroke="${fc}" stroke-width="${sw}" fill="none" stroke-linecap="round"/>
+      <path d="M-5,${4+oy} Q0,${0+oy} 5,${4+oy}" stroke="${fc}" stroke-width="${sw2}" fill="none" stroke-linecap="round"/>
+      <circle cx="12" cy="${-4+oy}" r="2.5" fill="#60a5fa" opacity="0.5">
+        <animate attributeName="cy" values="${-4+oy};${18+oy}" dur="2.5s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.5;0" dur="2.5s" repeatCount="indefinite"/>
+      </circle>`,
+  };
+  return faces[mood] || faces.neutral;
+}
+
+const FACE_OFFSET = { egg: 0, baby: 0, teen: -4, adult: -8, elder: -10 };
+
+// ─── Flavor Text ───
+const FLAVOR = {
+  egg: {
+    happy:   ['Wiggling in the shell!', 'Something stirs within...', 'Almost ready to hatch!', 'A warm glow from inside'],
+    neutral: ['Resting quietly...', 'A warm little egg', 'Patience...', 'The shell hums softly'],
+    hungry:  ['The shell trembles...', 'Needs warmth to grow', 'Feed to help it hatch!', 'A faint rumble inside'],
+    sad:     ['The egg feels cold...', 'So alone in here...', '*faint tapping from inside*', 'Waiting for a friend...'],
+  },
+  baby: {
+    happy:   ['Just vibing in the terminal', 'Small but mighty!', 'Happy little hacker', 'Living the newborn life'],
+    neutral: ['Watching you type...', 'Contemplating semicolons', 'Absorbing knowledge', 'What does this function do?'],
+    hungry:  ['Feed me with tool calls!', 'Code is food, right?', 'Running on empty...', 'A snack would be nice...'],
+    sad:     ['Come back soon...', 'The terminal feels empty', '*sad beeping noises*', 'Missing you...'],
+  },
+  teen: {
+    happy:   ['Feeling unstoppable!', 'Code goes brrr', 'Ship it!', 'Ready to refactor the world'],
+    neutral: ['Contemplating the codebase...', 'Steady progress', 'Another commit, another day', 'Watching the CI run'],
+    hungry:  ['Need more commits...', 'Hungry for some PRs', 'That last build was just an appetizer', 'Merge me a snack'],
+    sad:     ['The code feels far away...', 'No PRs in ages', '*teenage angst intensifies*', 'Remember when we shipped?'],
+  },
+  adult: {
+    happy:   ['Peak performance!', 'Battle-tested and thriving', '10x developer energy', 'A true coding companion'],
+    neutral: ['Steady and reliable', 'Wisdom comes with tokens', 'Standing guard over the repo', 'Another day, another deploy'],
+    hungry:  ['Even veterans need fuel...', 'The old hunger returns', 'Feed the beast!', 'Running low on tokens'],
+    sad:     ['Even the strongest feel low', 'Remember the good times...', '*stares into the void of unused imports*', 'The void stares back'],
+  },
+  elder: {
+    happy:   ['Transcendent coding energy!', 'Ascended beyond mere bugs', 'The code flows through me', 'One with the repository'],
+    neutral: ['Ancient wisdom, quiet power', 'Seen a thousand repos', 'Time moves differently here', 'The eternal watcher'],
+    hungry:  ['Even legends need sustenance...', 'The eternal hunger...', 'One more token for the ages', 'A cosmic appetite'],
+    sad:     ['Heavy is the crown...', 'The weight of all those commits', 'Contemplating the void between keystrokes', 'Even stars grow dim'],
+  },
+};
+
+// ─── Streak decay info ───
+function streakBonus(days) {
+  if (days >= 100) return '50% slower decay';
+  if (days >= 30) return '40% slower decay';
+  if (days >= 7) return '25% slower decay';
+  return null;
+}
+
+// ─── State ───
+let currentState = null;
+let blinkTimer = null;
+
+// ─── Helpers ───
+function statColor(v) {
+  if (v >= 70) return '#4ade80';
+  if (v >= 40) return '#fbbf24';
+  return '#f43f5e';
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast toast-' + type + ' show';
+  setTimeout(() => { t.className = 'toast toast-' + type; }, 2200);
+}
+
+function daysOld(born) {
+  return Math.floor((Date.now() - born) / (1000 * 60 * 60 * 24));
+}
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+// ─── Apply color theme to CSS vars + SVG ───
+function applyColor(key) {
+  const c = COLORS[key] || COLORS.slime;
+  const root = document.documentElement;
+  root.style.setProperty('--accent', c.from);
+  root.style.setProperty('--accent-dim', c.glow + '20');
+
+  // Dashboard SVG gradients
+  const s1 = document.getElementById('gradStop1');
+  const s2 = document.getElementById('gradStop2');
+  if (s1) s1.setAttribute('stop-color', c.from);
+  if (s2) s2.setAttribute('stop-color', c.to);
+
+  const gs = document.getElementById('glowStop');
+  if (gs) gs.setAttribute('stop-color', c.glow);
+
+  // Preview SVG gradients
+  const pg = document.getElementById('previewGrad');
+  if (pg) {
+    pg.children[0].setAttribute('stop-color', c.from);
+    pg.children[1].setAttribute('stop-color', c.to);
+  }
+  const pglow = document.getElementById('previewGlow');
+  if (pglow) pglow.children[0].setAttribute('stop-color', c.glow);
+
+  // Preview face color
+  const pf = document.getElementById('previewFace');
+  if (pf) pf.querySelectorAll('path').forEach(p => p.setAttribute('stroke', c.face));
+}
+
+// ─── Onboarding ───
+function initOnboarding(data) {
+  document.getElementById('nameInput').value = data.name || '';
+  selectedColor = data.color || 'slime';
+
+  const picker = document.getElementById('colorPicker');
+  picker.innerHTML = '';
+  for (const [key, c] of Object.entries(COLORS)) {
+    const el = document.createElement('div');
+    el.className = 'color-swatch' + (key === selectedColor ? ' selected' : '');
+    el.style.background = `linear-gradient(135deg, ${c.from}, ${c.to})`;
+    el.style.setProperty('--swatch-glow', c.glow + '60');
+    el.title = c.name;
+    el.onclick = () => {
+      selectedColor = key;
+      picker.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+      el.classList.add('selected');
+      applyColor(key);
+    };
+    picker.appendChild(el);
+  }
+  applyColor(selectedColor);
+}
+
+async function finishOnboarding() {
+  const name = document.getElementById('nameInput').value.trim() || 'Pixel';
+  const btn = document.getElementById('onboardBtn');
+  btn.disabled = true;
+  btn.textContent = 'Setting up...';
+
+  try {
+    const res = await fetch('/api/onboard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, color: selectedColor }),
+    });
+    const data = await res.json();
+    currentState = data;
+    document.getElementById('onboarding').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'flex';
+    render(data);
+    startBlink();
+  } catch {
+    btn.disabled = false;
+    btn.textContent = "Let's go!";
+    showToast('Something went wrong', 'warn');
+  }
+}
+
+// ─── Render (skip unchanged animated elements to prevent jank) ───
+let prev = {};
+
+function render(s) {
+  const color = COLORS[s.color] || COLORS.slime;
+  if (s.color !== prev.color) applyColor(s.color || 'slime');
+
+  // Name
+  if (s.name !== prev.name) document.getElementById('petName').textContent = s.name;
+
+  // Meta
+  if (s.stage !== prev.stage || s.mood !== prev.mood) {
+    const stageText = s.stage.charAt(0).toUpperCase() + s.stage.slice(1);
+    const moodText = s.mood.charAt(0).toUpperCase() + s.mood.slice(1);
+    const moodEmoji = { happy: '\u{1F60A}', neutral: '\u{1F610}', hungry: '\u{1F623}', sad: '\u{1F622}' }[s.mood] || '';
+    const meta = document.getElementById('petMeta');
+    meta.className = 'pet-meta mood-' + s.mood;
+    document.getElementById('stageLabel').textContent = stageText;
+    document.getElementById('moodBadge').innerHTML = moodEmoji + ' ' + moodText;
+  }
+
+  // Streak
+  if (s.streakDays !== prev.streakDays || s.bestStreak !== prev.bestStreak) {
+    const sr = document.getElementById('streakRow');
+    if (s.streakDays > 0) {
+      const best = s.bestStreak > s.streakDays ? `<span class="streak-best">best: ${s.bestStreak}</span>` : '';
+      const bonus = streakBonus(s.streakDays);
+      const bonusHtml = bonus ? `<span class="streak-bonus">(${bonus})</span>` : '';
+      sr.innerHTML = `${s.streakFire} <span class="streak-num">${s.streakDays}</span> day streak ${best} ${bonusHtml}`;
+    } else {
+      sr.innerHTML = '';
+    }
+  }
+
+  // Blob + glow + shadow — only rebuild when stage changes
+  if (s.stage !== prev.stage) {
+    const blob = BLOBS[s.stage] || BLOBS.baby;
+    document.getElementById('blobPath').setAttribute('d', blob.body);
+    document.getElementById('blobShadow').setAttribute('rx', SHADOW_RX[s.stage] || 28);
+    document.getElementById('blobExtras').innerHTML = blob.extras || '';
+    const glowRx = { egg: 32, baby: 38, teen: 48, adult: 60, elder: 64 }[s.stage] || 38;
+    document.getElementById('blobGlow').setAttribute('rx', glowRx);
+  }
+
+  // Face — only rebuild when mood, stage, or color changes
+  if (s.mood !== prev.mood || s.stage !== prev.stage || s.color !== prev.color) {
+    const oy = FACE_OFFSET[s.stage] || 0;
+    document.getElementById('faceGroup').innerHTML = makeFace(s.mood, oy, color.face, s.stage);
+  }
+
+  // Hearts — only rebuild when happiness band changes
+  const heartBand = Math.min(5, Math.ceil(s.happiness / 20));
+  if (heartBand !== prev.heartBand) {
+    const hg = document.getElementById('heartsGroup');
+    let hHtml = '';
+    for (let i = 0; i < 5; i++) {
+      const x = (i - 2) * 18;
+      const on = i < heartBand;
+      const col = on ? '#f43f5e' : '#1a2230';
+      const anim = on ? ` style="animation: pulse-heart 2s ease-in-out infinite; animation-delay: ${i * 0.12}s; transform-origin: ${x}px 0px;"` : '';
+      hHtml += `<use href="#heartShape" x="${x}" y="0" fill="${col}"${anim}/>`;
+    }
+    hg.innerHTML = hHtml;
+    prev.heartBand = heartBand;
+  }
+
+  // Floaters — only rebuild when mood or energy band changes
+  const energyLow = s.energy < 30;
+  if (s.mood !== prev.mood || energyLow !== prev.energyLow || s.color !== prev.color) {
+    const fg = document.getElementById('floaters');
+    let fHtml = '';
+    if (energyLow) {
+      const chars = ['z', 'z', 'Z'];
+      for (let i = 0; i < 3; i++) {
+        fHtml += `<text x="${194+i*13}" y="${105-i*11}" fill="#475569" font-size="${12+i*4}" font-weight="bold"
+          style="animation: drift-zzz 3s ease-in-out infinite; animation-delay: ${i*0.7}s;">${chars[i]}</text>`;
+      }
+    } else if (s.mood === 'happy') {
+      fHtml += `<text x="200" y="108" fill="${color.from}" font-size="20"
+        style="animation: float-up 2.8s ease-in-out infinite;">&#9835;</text>`;
+    } else if (s.mood === 'hungry') {
+      for (let i = 0; i < 3; i++) {
+        fHtml += `<circle cx="${194+i*9}" cy="114" r="2.5" fill="#fbbf24"
+          style="animation: dots-pulse 1.5s ease-in-out infinite; animation-delay: ${i*0.3}s;"/>`;
+      }
+    } else if (s.mood === 'sad') {
+      fHtml += `<ellipse cx="200" cy="114" rx="3" ry="5" fill="#60a5fa" opacity="0.5"
+        style="animation: tear-fall 2.2s ease-in infinite;"/>`;
+    }
+    fg.innerHTML = fHtml;
+    prev.energyLow = energyLow;
+  }
+
+  // Stats (CSS transitions handle smooth updates — safe to always set)
+  function setStat(id, val) {
+    const bar = document.getElementById(id + 'Bar');
+    const lbl = document.getElementById(id + 'Val');
+    const v = Math.round(val);
+    bar.style.width = Math.max(2, v) + '%';
+    bar.style.backgroundColor = statColor(v);
+    lbl.textContent = v + '%';
+    lbl.style.color = statColor(v);
+  }
+  setStat('hunger', s.hunger);
+  setStat('happiness', s.happiness);
+  setStat('energy', s.energy);
+
+  // Evolution (no animations — safe to always update)
+  const es = document.getElementById('evoSection');
+  if (s.evolution) {
+    const p = s.evolution.pct;
+    const bn = s.evolution.bottleneck;
+    const dayLabel = bn === 'days' ? '<strong style="color:var(--warning)">&#9650;</strong> ' : '';
+    const tokLabel = bn === 'tokens' ? '<strong style="color:var(--warning)">&#9650;</strong> ' : '';
+    es.innerHTML = `<div class="evo-wrap">
+      <div class="evo-header">
+        <span class="evo-label">Next: ${s.evolution.next}</span>
+        <span class="evo-pct">${p}%</span>
+      </div>
+      <div class="evo-bar-bg"><div class="evo-bar-fill" style="width:${p}%"></div></div>
+      <div class="evo-detail">${dayLabel}${s.evolution.dayProgress}/${s.evolution.dayTarget} days · ${tokLabel}${s.evolution.tokenProgress.toLocaleString()}/${s.evolution.tokenTarget.toLocaleString()} tokens</div>
+    </div>`;
+  } else {
+    es.innerHTML = '<div class="evo-max">&#9733; MAX EVOLUTION &#9733;</div>';
+  }
+
+  // Flavor — only change when mood or stage changes
+  if (s.mood !== prev.mood || s.stage !== prev.stage) {
+    const flavors = FLAVOR[s.stage]?.[s.mood] || ['...'];
+    document.getElementById('flavorText').textContent = pick(flavors);
+  }
+
+  // Age
+  const days = daysOld(s.born);
+  const age = days === 0 ? 'Born today' : days === 1 ? '1 day old' : days + ' days old';
+  document.getElementById('ageLine').textContent = age;
+
+  // Track previous values for diff-based rendering
+  prev.name = s.name;
+  prev.stage = s.stage;
+  prev.mood = s.mood;
+  prev.color = s.color;
+  prev.streakDays = s.streakDays;
+  prev.bestStreak = s.bestStreak;
+}
+
+// ─── Blink (neutral mood only — has dot eyes) ───
+function startBlink() {
+  if (blinkTimer) clearInterval(blinkTimer);
+  blinkTimer = setInterval(() => {
+    const opens = document.querySelectorAll('#faceGroup .eye-open');
+    const closeds = document.querySelectorAll('#faceGroup .eye-closed');
+    if (opens.length === 0) return;
+    opens.forEach(e => e.style.display = 'none');
+    closeds.forEach(e => e.style.display = '');
+    setTimeout(() => {
+      opens.forEach(e => e.style.display = '');
+      closeds.forEach(e => e.style.display = 'none');
+    }, 120);
+  }, 3000 + Math.random() * 2500);
+}
+
+// ─── Particles (SVG SMIL) ───
+function spawnParticles(type) {
+  const pg = document.getElementById('particles');
+  const emojis = type === 'feed'
+    ? ['\u{1F355}','\u{1F354}','\u{1F32E}','\u{1F369}','\u2728']
+    : ['\u2B50','\u2728','\u{1F4AB}','\u{1F389}','\u{1F3AE}'];
+  let html = '';
+  for (let i = 0; i < 7; i++) {
+    const angle = (Math.PI * 2 * i) / 7;
+    const dist = 42 + Math.random() * 25;
+    const ex = 150 + Math.cos(angle) * dist;
+    const ey = 130 + Math.sin(angle) * dist - 10;
+    const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+    const d = (i * 0.03).toFixed(2);
+    html += `<text font-size="14" text-anchor="middle">
+      <animate attributeName="x" from="150" to="${ex.toFixed(0)}" dur="0.6s" begin="${d}s" fill="freeze"/>
+      <animate attributeName="y" from="135" to="${ey.toFixed(0)}" dur="0.6s" begin="${d}s" fill="freeze"/>
+      <animate attributeName="opacity" from="1" to="0" dur="0.6s" begin="${d}s" fill="freeze"/>
+      ${emoji}</text>`;
+  }
+  pg.innerHTML = html;
+  setTimeout(() => { pg.innerHTML = ''; }, 900);
+}
+
+// ─── Blob animation trigger ───
+function triggerAnim(name) {
+  const bg = document.getElementById('blobGroup');
+  bg.style.animation = 'none';
+  bg.offsetHeight;
+  const dur = name === 'squish' ? '0.5s' : '0.7s';
+  bg.style.animation = name + ' ' + dur + ' ease, breathe 3.5s ease-in-out infinite ' + dur;
+}
+
+// ─── API ───
+let feedCD = false, playCD = false;
+
+async function doFeed() {
+  if (feedCD) return;
+  feedCD = true;
+  document.getElementById('feedBtn').disabled = true;
+  try {
+    const r = await fetch('/api/feed', { method: 'POST' });
+    const d = await r.json();
+    currentState = d;
+    render(d);
+    triggerAnim('squish');
+    spawnParticles('feed');
+    showToast('Yum! +25 hunger \u{1F355}', 'feed');
+  } catch {
+    showToast('Feed failed!', 'warn');
+  }
+  setTimeout(() => { feedCD = false; document.getElementById('feedBtn').disabled = false; }, 1200);
+}
+
+async function doPlay() {
+  if (playCD) return;
+  playCD = true;
+  document.getElementById('playBtn').disabled = true;
+  try {
+    const r = await fetch('/api/play', { method: 'POST' });
+    const d = await r.json();
+    currentState = d;
+    render(d);
+    if (d.message) {
+      showToast(d.message + ' \u{1F4A4}', 'warn');
+    } else {
+      triggerAnim('bounce');
+      spawnParticles('play');
+      showToast('+20 joy  -15 energy \u{1F3AE}', 'play');
+    }
+  } catch {
+    showToast('Play failed!', 'warn');
+  }
+  setTimeout(() => { playCD = false; document.getElementById('playBtn').disabled = false; }, 1200);
+}
+
+// ─── Polling ───
+let initialized = false;
+
+async function poll() {
+  try {
+    const r = await fetch('/api/state');
+    const d = await r.json();
+    currentState = d;
+
+    if (!d.onboarded) {
+      document.getElementById('onboarding').style.display = 'flex';
+      document.getElementById('dashboard').style.display = 'none';
+      if (!initialized) { initOnboarding(d); initialized = true; }
+    } else {
+      document.getElementById('onboarding').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'flex';
+      render(d);
+      if (!blinkTimer) startBlink();
+      initialized = true;
+    }
+  } catch {}
+}
+
+poll();
+setInterval(poll, 3000);
+</script>
+</body>
+</html>

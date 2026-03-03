@@ -65,16 +65,50 @@ Or name your pet on install:
 - **Hungry** (20–39) — `>_<` with `...`
 - **Sad** (0–19) — `;_;` with a teardrop
 
+## Browser Dashboard
+
+Open a live SVG dashboard in your browser that auto-updates as you code:
+
+```
+/pet dashboard
+```
+
+Or run directly:
+
+```bash
+node ~/.claude/tamagotchi/pet-engine.js dashboard
+```
+
+The dashboard runs on `http://localhost:7742` — shows your pet's animated blob, stats, hearts, and lets you feed/play from the browser.
+
+## Menu Bar App (macOS)
+
+Pin your pet to the macOS menu bar — always visible, zero-friction:
+
+```bash
+cd ~/.claude/tamagotchi/menubar && npm install
+```
+
+Then launch it:
+
+```
+/pet menubar
+```
+
+A blob icon appears in your menu bar. Click it to see the full dashboard in a popover. Click away to dismiss. The dashboard server starts automatically if it isn't already running.
+
 ## Commands
 
 Use these inside Claude Code:
 
 ```
-/pet          — Full status display
-/pet feed     — Give a snack (+25 hunger)
-/pet play     — Play together (+20 happiness, -15 energy)
-/pet name X   — Rename your pet
-/pet help     — Show commands
+/pet            — Full status display
+/pet feed       — Give a snack (+25 hunger)
+/pet play       — Play together (+20 happiness, -15 energy)
+/pet name X     — Rename your pet
+/pet dashboard  — Open the browser dashboard
+/pet menubar    — Launch the macOS menu bar app
+/pet help       — Show commands
 ```
 
 ## What it installs
@@ -86,6 +120,13 @@ All files go inside `~/.claude/` (Claude Code's config directory):
 ├── tamagotchi/
 │   ├── pet-engine.js      # Game engine
 │   ├── state.json         # Pet state (created on first run)
+│   ├── dashboard/
+│   │   ├── server.js      # HTTP server (localhost:7742)
+│   │   └── index.html     # SVG animated dashboard
+│   ├── menubar/           # Optional macOS menu bar app
+│   │   ├── package.json
+│   │   ├── main.js
+│   │   └── icon.js
 │   └── hooks/
 │       ├── post-tool-use.sh   # Feeds pet on tool use
 │       └── session-start.sh   # Shows status on session start

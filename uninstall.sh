@@ -41,6 +41,13 @@ if (settings.hooks) {
 fs.writeFileSync(path, JSON.stringify(settings, null, 2));
 "
 
+# ─── Kill dashboard server if running ───
+lsof -ti:7742 | xargs kill -9 2>/dev/null || true
+
+# ─── Kill menu bar Electron process if running ───
+pkill -f 'electron.*claude-pet' 2>/dev/null || true
+pkill -f 'Electron.*menubar/main.js' 2>/dev/null || true
+
 # ─── Remove files ───
 info "Removing files..."
 rm -rf "$INSTALL_DIR"

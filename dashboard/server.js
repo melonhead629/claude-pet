@@ -1,0 +1,151 @@
+#!/usr/bin/env node
+
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const engine = require('../pet-engine.js');
+
+const PORT = 7742;
+const HTML_FILE = path.join(__dirname, 'index.html');
+
+function getEnrichedState() {
+  let state = engine.loadState();
+  if (!state) {
+    state = engine.createDefaultState();
+    engine.saveState(state);
+  }
+  engine.updateStreak(state);
+  engine.applyDecay(state);
+  engine.saveState(state);
+
+  const activeDays = state.activeDays || 0;
+  const stage = engine.getStage(activeDays, state.lifetimeTokens);
+  const mood = engine.getMood(state.hunger, state.happiness);
+  const evolution = engine.getEvolution(activeDays, state.lifetimeTokens);
+  const fire = engine.streakFire(state.streakDays || 0);
+
+  return {
+    name: state.name,
+    hunger: Math.round(state.hunger * 10) / 10,
+    happiness: Math.round(state.happiness * 10) / 10,
+    energy: Math.round(state.energy * 10) / 10,
+    lifetimeTokens: state.lifetimeTokens,
+    activeDays,
+    streakDays: state.streakDays || 0,
+    bestStreak: state.bestStreak || 0,
+    milestones: state.milestones || [],
+    born: state.born,
+    stage,
+    mood,
+    evolution,
+    streakFire: fire,
+    color: state.color || 'slime',
+    onboarded: !!state.onboarded,
+  };
+}
+
+function jsonResponse(res, data, status = 200) {
+  res.writeHead(status, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+  });
+  res.end(JSON.stringify(data));
+}
+
+function readBody(req) {
+  return new Promise((resolve) => {
+    let body = '';
+    req.on('data', (chunk) => { body += chunk; });
+    req.on('end', () => resolve(body));
+  });
+}
+
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, `http://localhost:${PORT}`);
+
+  if (req.method === 'GET' && url.pathname === '/') {
+    try {
+      const html = fs.readFileSync(HTML_FILE, 'utf8');
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(html);
+    } catch {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('index.html not found');
+    }
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/state') {
+    jsonResponse(res, getEnrichedState());
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/feed') {
+    let state = engine.loadState();
+    if (!state) return jsonResponse(res, { error: 'No pet found' }, 404);
+    engine.updateStreak(state);
+    engine.applyDecay(state);
+    state.hunger = engine.clamp(state.hunger + 25);
+    state.lifetimeTokens += 25;
+    engine.saveState(state);
+    jsonResponse(res, getEnrichedState());
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/onboard') {
+    const body = JSON.parse(await readBody(req));
+    let state = engine.loadState();
+    if (!state) state = engine.createDefaultState(body.name || 'Pixel');
+    if (body.name) state.name = body.name;
+    if (body.color) state.color = body.color;
+    state.onboarded = true;
+    engine.saveState(state);
+    jsonResponse(res, getEnrichedState());
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/settings') {
+    const body = JSON.parse(await readBody(req));
+    let state = engine.loadState();
+    if (!state) return jsonResponse(res, { error: 'No pet found' }, 404);
+    if (body.color) state.color = body.color;
+    if (body.name) state.name = body.name;
+    engine.saveState(state);
+    jsonResponse(res, getEnrichedState());
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/play') {
+    let state = engine.loadState();
+    if (!state) return jsonResponse(res, { error: 'No pet found' }, 404);
+    engine.updateStreak(state);
+    engine.applyDecay(state);
+    if (state.energy < 10) {
+      engine.saveState(state);
+      return jsonResponse(res, { ...getEnrichedState(), message: 'Too tired to play!' });
+    }
+    state.happiness = engine.clamp(state.happiness + 20);
+    state.energy = engine.clamp(state.energy - 15);
+    state.hunger = engine.clamp(state.hunger - 5);
+    engine.saveState(state);
+    jsonResponse(res, getEnrichedState());
+    return;
+  }
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    });
+    res.end();
+    return;
+  }
+
+  res.writeHead(404, { 'Content-Type': 'text/plain' });
+  res.end('Not found');
+});
+
+server.listen(PORT, '127.0.0.1', () => {
+  console.log(`claude-pet dashboard running at http://localhost:${PORT}`);
+});

@@ -1,0 +1,10 @@
+{
+  "name": "claude-pet-menubar",
+  "version": "1.0.0",
+  "private": true,
+  "main": "main.js",
+  "dependencies": {
+    "menubar": "^9.4.0",
+    "electron": "^28.0.0"
+  }
+}

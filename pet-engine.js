@@ -48,11 +48,23 @@ function getYesterday() {
   return getLocalDate(d);
 }
 
-// ─── Evolution stages ───
-function getStage(lifetimeTokens) {
-  if (lifetimeTokens >= 10000) return 'adult';
-  if (lifetimeTokens >= 1000) return 'teen';
-  return 'baby';
+// ─── Evolution stages (dual-gated: active days + tokens) ───
+const STAGES = [
+  { name: 'egg',   minDays: 0,  minTokens: 0 },
+  { name: 'baby',  minDays: 1,  minTokens: 100 },
+  { name: 'teen',  minDays: 5,  minTokens: 1500 },
+  { name: 'adult', minDays: 14, minTokens: 8000 },
+  { name: 'elder', minDays: 30, minTokens: 25000 },
+];
+
+function getStage(activeDays, lifetimeTokens) {
+  let stage = STAGES[0].name;
+  for (const s of STAGES) {
+    if (activeDays >= s.minDays && lifetimeTokens >= s.minTokens) {
+      stage = s.name;
+    }
+  }
+  return stage;
 }
 
 // ─── Mood from avg(hunger, happiness) ───
@@ -72,6 +84,29 @@ function migrateState(state) {
   if (state.lastActiveDate === undefined) state.lastActiveDate = null;
   if (state.bestStreak === undefined) state.bestStreak = 0;
   if (state.milestones === undefined) state.milestones = [];
+  if (state.color === undefined) state.color = 'slime';
+  // onboarded: undefined means needs onboarding (pick name + color)
+
+  // Migration: add activeDays tracking
+  if (state.activeDaysSet === undefined) {
+    // Estimate from min(daysAlive, lifetimeTokens / 200)
+    const daysAlive = state.born ? Math.floor((Date.now() - state.born) / (1000 * 60 * 60 * 24)) : 0;
+    const estimated = Math.min(daysAlive, Math.floor((state.lifetimeTokens || 0) / 200));
+    state.activeDaysSet = [];
+    // Backfill estimated active days
+    for (let i = 0; i < estimated; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - (estimated - i));
+      state.activeDaysSet.push(getLocalDate(d));
+    }
+    // Ensure lastActiveDate is included (covers same-day-born pets)
+    if (state.lastActiveDate && !state.activeDaysSet.includes(state.lastActiveDate)) {
+      state.activeDaysSet.push(state.lastActiveDate);
+    }
+    state.activeDays = state.activeDaysSet.length;
+  }
+  if (state.activeDays === undefined) state.activeDays = state.activeDaysSet.length;
+
   return state;
 }
 
@@ -89,6 +124,12 @@ function updateStreak(state) {
 
   state.lastActiveDate = today;
   state.bestStreak = Math.max(state.bestStreak, state.streakDays);
+
+  // Track unique active days
+  if (!state.activeDaysSet.includes(today)) {
+    state.activeDaysSet.push(today);
+    state.activeDays = state.activeDaysSet.length;
+  }
 
   for (const m of STREAK_MILESTONES) {
     if (state.streakDays >= m && !state.milestones.includes(m)) {
@@ -116,7 +157,7 @@ function streakFire(streakDays) {
 // ─── Aura line based on milestones ───
 function getAuraLine(stage, milestones) {
   if (!milestones || milestones.length === 0) return null;
-  const pad = { baby: '   ', teen: '     ', adult: '        ' }[stage];
+  const pad = { egg: '  ', baby: '   ', teen: '     ', adult: '        ', elder: '          ' }[stage] || '   ';
   if (milestones.includes(100)) return `${pad}  ${c.by}♛${c.r}`;
   if (milestones.includes(30)) return `${pad} ${c.by}⚡*⚡${c.r}`;
   if (milestones.includes(7)) return `${pad} ${c.by}~*~${c.r}`;
@@ -125,6 +166,12 @@ function getAuraLine(stage, milestones) {
 
 // ─── ASCII Art (blob/slime shapes) ───
 const ART = {
+  egg: {
+    happy:   ['      __', '    /    \\', '   |  · · |', '    \\____/'],
+    neutral: ['      __', '    /    \\', '   |  · · |', '    \\____/'],
+    hungry:  ['      __', '    /    \\', '   |  · · |', '    \\____/'],
+    sad:     ['      __', '    /    \\', '   |  · · |', '    \\____/'],
+  },
   baby: {
     happy:   ['     _.-._', '    / ^_^ \\', '   |       |', '    \\_____/'],
     neutral: ['     _.-._', '    / o_o \\', '   |       |', '    \\_____/'],
@@ -142,6 +189,12 @@ const ART = {
     neutral: ['       _.------._', '      / o      o \\', '    (      __     )', '    (              )', '     \\            /', "      '----------'"],
     hungry:  ['       _.------._', '      / >      < \\', '    (      ~~     )', '    (              )', '     \\            /', "      '----------'"],
     sad:     ['       _.------._', '      / ;      ; \\', '    (      __     )', '    (       |      )', '     \\            /', "      '----------'"],
+  },
+  elder: {
+    happy:   ['          ~*~*~*~', '        _.--------._', '   ~   / ^        ^ \\   ~', '      (      \\_/      )', '      (               )', '       \\             /', "        '-----------'"],
+    neutral: ['          ~*~*~*~', '        _.--------._', '   ~   / o        o \\   ~', '      (      __      )', '      (               )', '       \\             /', "        '-----------'"],
+    hungry:  ['          ~*~*~*~', '        _.--------._', '   ~   / >        < \\   ~', '      (      ~~      )', '      (               )', '       \\             /', "        '-----------'"],
+    sad:     ['          ~*~*~*~', '        _.--------._', '   ~   / ;        ; \\   ~', '      (      __      )', '      (       |       )', '       \\             /', "        '-----------'"],
   },
 };
 
@@ -168,7 +221,7 @@ function buildScene(stage, mood, state) {
   for (let i = 0; i < 5; i++) {
     hearts.push(i < filledCount ? `${c.br}♥${c.r}` : `${c.gy}♡${c.r}`);
   }
-  const heartPad = { baby: '   ', teen: '     ', adult: '        ' }[stage];
+  const heartPad = { egg: '  ', baby: '   ', teen: '     ', adult: '        ', elder: '          ' }[stage] || '   ';
   lines.push(`${heartPad}${hearts.join(' ')}`);
   lines.push('');
 
@@ -184,7 +237,7 @@ function buildScene(stage, mood, state) {
   }
 
   // Ground line
-  const groundWidth = { baby: 15, teen: 19, adult: 23 }[stage];
+  const groundWidth = { egg: 12, baby: 15, teen: 19, adult: 23, elder: 27 }[stage] || 15;
   lines.push(`${c.gy}${'░'.repeat(groundWidth)}${c.r}`);
 
   return lines;
@@ -192,6 +245,28 @@ function buildScene(stage, mood, state) {
 
 // ─── Flavor text ───
 const FLAVOR = {
+  egg: {
+    happy: [
+      '* Wiggling in the shell!',
+      '~ Something is stirring...',
+      '* Almost ready to hatch!',
+    ],
+    neutral: [
+      '  Resting quietly...',
+      '  A warm little egg.',
+      '  Patience...',
+    ],
+    hungry: [
+      '  The shell trembles...',
+      '  Needs warmth to grow...',
+      '  Feed to help it hatch!',
+    ],
+    sad: [
+      '  The egg feels cold...',
+      '  So alone in here...',
+      '  *faint tapping from inside*',
+    ],
+  },
   baby: {
     happy: [
       '* Bouncing with joy!',
@@ -258,6 +333,28 @@ const FLAVOR = {
       '  *stares into the void of unused imports*',
     ],
   },
+  elder: {
+    happy: [
+      '* Transcendent coding energy!',
+      '~ Ascended beyond mere bugs!',
+      '* The code flows through me!',
+    ],
+    neutral: [
+      '  Ancient wisdom, quiet power.',
+      '  Seen a thousand repos.',
+      '  Time moves differently here.',
+    ],
+    hungry: [
+      '  Even legends need sustenance...',
+      '  The eternal hunger...',
+      '  One more token for the ages...',
+    ],
+    sad: [
+      '  Heavy is the crown...',
+      '  The weight of all those commits...',
+      '  *contemplates the void between keystrokes*',
+    ],
+  },
 };
 
 function getFlavorText(stage, mood) {
@@ -283,29 +380,44 @@ function statBar(value, width = 10) {
   return `${color}${'█'.repeat(filled)}${c.gy}${'░'.repeat(empty)}${c.r}`;
 }
 
-// ─── Evolution progress ───
-function getEvolution(tokens) {
-  const stage = getStage(tokens);
-  if (stage === 'adult') return null;
+// ─── Evolution progress (dual-axis: days + tokens) ───
+function getEvolution(activeDays, lifetimeTokens) {
+  const stage = getStage(activeDays, lifetimeTokens);
+  if (stage === 'elder') return null;
 
-  const thresholds = {
-    baby: { start: 0, end: 1000, next: 'Teen' },
-    teen: { start: 1000, end: 10000, next: 'Adult' },
-  };
-  const t = thresholds[stage];
-  const progress = tokens - t.start;
-  const range = t.end - t.start;
-  const pct = Math.min(progress / range, 1);
+  // Find current and next stage index
+  const idx = STAGES.findIndex(s => s.name === stage);
+  const next = STAGES[idx + 1];
+  if (!next) return null;
+
+  const cur = STAGES[idx];
+
+  // Calculate progress on each axis
+  const dayRange = next.minDays - cur.minDays;
+  const tokenRange = next.minTokens - cur.minTokens;
+  const dayProgress = Math.min(activeDays - cur.minDays, dayRange);
+  const tokenProgress = Math.min(lifetimeTokens - cur.minTokens, tokenRange);
+  const dayPct = dayRange > 0 ? dayProgress / dayRange : 1;
+  const tokenPct = tokenRange > 0 ? tokenProgress / tokenRange : 1;
+
+  // Bottleneck is the one further from completion
+  const bottleneck = dayPct <= tokenPct ? 'days' : 'tokens';
+  const pct = Math.min(dayPct, tokenPct); // overall progress = bottleneck
+
   const width = 20;
   const filled = Math.round(pct * width);
   const empty = width - filled;
+  const nextLabel = next.name.charAt(0).toUpperCase() + next.name.slice(1);
 
   return {
     bar: `${c.cy}${'▓'.repeat(filled)}${c.gy}${'░'.repeat(empty)}${c.r}`,
-    next: t.next,
-    progress,
-    target: range,
+    next: nextLabel,
     pct: Math.round(pct * 100),
+    bottleneck,
+    dayProgress,
+    dayTarget: dayRange,
+    tokenProgress,
+    tokenTarget: tokenRange,
   };
 }
 
@@ -340,6 +452,8 @@ function createDefaultState(name) {
     lastActiveDate: null,
     bestStreak: 0,
     milestones: [],
+    activeDays: 0,
+    activeDaysSet: [],
   };
 }
 
@@ -419,7 +533,7 @@ const actions = {
     applyDecay(state);
     saveState(state);
 
-    const stage = getStage(state.lifetimeTokens);
+    const stage = getStage(state.activeDays || 0, state.lifetimeTokens);
     const mood = getMood(state.hunger, state.happiness);
     const stageLabel = stage.charAt(0).toUpperCase() + stage.slice(1);
     const moodLabel = mood.charAt(0).toUpperCase() + mood.slice(1);
@@ -463,13 +577,15 @@ const actions = {
     lines.push('');
 
     // ── Evolution progress ──
-    const evo = getEvolution(state.lifetimeTokens);
+    const evo = getEvolution(state.activeDays || 0, state.lifetimeTokens);
     if (evo) {
       const evoTitle = `Next: ${evo.next}`;
       const dashLen = Math.max(1, 30 - evoTitle.length);
       lines.push(`  ${c.gy}──${c.r} ${c.cy}${evoTitle}${c.r} ${c.gy}${'─'.repeat(dashLen)}${c.r}`);
       lines.push(`  ${evo.bar}  ${c.d}${String(evo.pct).padStart(3)}%${c.r}`);
-      lines.push(`  ${c.d}${evo.progress.toLocaleString()} / ${evo.target.toLocaleString()} tokens${c.r}`);
+      const bottleLabel = evo.bottleneck === 'days' ? 'days' : 'tokens';
+      lines.push(`  ${c.d}${evo.dayProgress}/${evo.dayTarget} days · ${evo.tokenProgress.toLocaleString()}/${evo.tokenTarget.toLocaleString()} tokens${c.r}`);
+      lines.push(`  ${c.d}(${bottleLabel} is the bottleneck)${c.r}`);
     } else {
       lines.push(`  ${c.bm}${c.b}★ MAX EVOLUTION ★${c.r}`);
     }
@@ -512,7 +628,7 @@ const actions = {
     state.hunger = clamp(state.hunger - 5);
     saveState(state);
 
-    const stage = getStage(state.lifetimeTokens);
+    const stage = getStage(state.activeDays || 0, state.lifetimeTokens);
     const mood = getMood(state.hunger, state.happiness);
     const scene = buildScene(stage, mood, state);
 
@@ -535,7 +651,7 @@ const actions = {
     state.lifetimeTokens += 25;
     saveState(state);
 
-    const stage = getStage(state.lifetimeTokens);
+    const stage = getStage(state.activeDays || 0, state.lifetimeTokens);
     const mood = getMood(state.hunger, state.happiness);
     const scene = buildScene(stage, mood, state);
 
@@ -559,14 +675,85 @@ const actions = {
     saveState(state);
     console.log(`Renamed "${oldName}" to "${newName}"!`);
   },
+
+  dashboard() {
+    const { execSync, fork } = require('child_process');
+    const net = require('net');
+    const serverPath = path.join(__dirname, 'dashboard', 'server.js');
+    const url = 'http://localhost:7742';
+
+    function openBrowser(u) {
+      const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+      try { execSync(`${cmd} ${u}`); } catch {}
+    }
+
+    // Check if port 7742 is free
+    const probe = net.createServer();
+    probe.once('error', () => {
+      // Port occupied — assume already running
+      console.log('Dashboard already running.');
+      openBrowser(url);
+    });
+    probe.once('listening', () => {
+      probe.close();
+      // Port free — start server
+      const child = fork(serverPath, [], { detached: true, stdio: 'ignore' });
+      child.unref();
+      console.log(`Dashboard started at ${url}`);
+      setTimeout(() => openBrowser(url), 500);
+    });
+    probe.listen(7742, '127.0.0.1');
+  },
+
+  menubar() {
+    const { spawn } = require('child_process');
+    const menubarDir = path.join(__dirname, 'menubar');
+
+    if (!fs.existsSync(path.join(menubarDir, 'node_modules'))) {
+      console.log('Menu bar dependencies not installed.');
+      console.log(`Run: cd ${menubarDir} && npm install`);
+      return;
+    }
+
+    // Find electron binary
+    const electronPath = path.join(menubarDir, 'node_modules', '.bin', 'electron');
+    const mainPath = path.join(menubarDir, 'main.js');
+
+    const child = spawn(electronPath, [mainPath], {
+      detached: true,
+      stdio: 'ignore',
+      cwd: menubarDir,
+    });
+    child.unref();
+
+    console.log('Menu bar app started — look for the blob icon in your menu bar.');
+  },
 };
 
-// ─── Main ───
-const action = process.argv[2];
-if (!action || !actions[action]) {
-  console.log('Usage: node pet-engine.js <action> [args]');
-  console.log('Actions: init, feed <tool>, decay, status, status-brief, play, manual-feed, name <name>');
-  process.exit(1);
+// ─── Main (CLI) ───
+if (require.main === module) {
+  const action = process.argv[2];
+  if (!action || !actions[action]) {
+    console.log('Usage: node pet-engine.js <action> [args]');
+    console.log('Actions: init, feed <tool>, decay, status, status-brief, play, manual-feed, name <name>, dashboard, menubar');
+    process.exit(1);
+  }
+  actions[action]();
 }
 
-actions[action]();
+// ─── Exports (for dashboard server) ───
+module.exports = {
+  loadState,
+  saveState,
+  applyDecay,
+  updateStreak,
+  clamp,
+  getStage,
+  getMood,
+  getEvolution,
+  streakFire,
+  getStreakDecayMultiplier,
+  createDefaultState,
+  migrateState,
+  STAGES,
+};
