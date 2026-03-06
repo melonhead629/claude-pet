@@ -1235,8 +1235,10 @@ function render(s) {
 
   // Flavor — only change when mood or stage changes
   if (s.mood !== prev.mood || s.stage !== prev.stage) {
+    const moodEmoji = { happy: '\u{1F60A}', neutral: '\u{1F610}', tired: '\u{1F634}', sad: '\u{1F622}', neglected: '\u{1F915}' };
     const flavors = FLAVOR[s.stage]?.[s.mood] || ['...'];
-    document.getElementById('flavorText').textContent = pick(flavors);
+    const emoji = moodEmoji[s.mood] || '';
+    document.getElementById('flavorText').textContent = `${emoji} ${s.name}: "${pick(flavors)}"`;
   }
 
   // Tip — rotate every ~30s
